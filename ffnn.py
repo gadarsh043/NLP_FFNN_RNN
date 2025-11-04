@@ -10,6 +10,7 @@ import time
 from tqdm import tqdm
 import json
 from argparse import ArgumentParser
+import matplotlib.pyplot as plt
 
 
 unk = '<UNK>'
@@ -24,7 +25,7 @@ class FFNN(nn.Module):
         self.output_dim = 5
         self.W2 = nn.Linear(h, self.output_dim)
 
-        self.softmax = nn.LogSoftmax() # The softmax function that converts vectors into probability distributions; computes log probabilities for computational benefits
+        self.softmax = nn.LogSoftmax(dim=-1)
         self.loss = nn.NLLLoss() # The cross-entropy/negative log likelihood loss taught in class
 
     def compute_Loss(self, predicted_vector, gold_label):
@@ -37,7 +38,17 @@ class FFNN(nn.Module):
 
         # [to fill] obtain probability dist.
 
-        return predicted_vector
+        # Linear function 1
+        out = self.W1(input_vector)
+        # Non-linearity 1
+        out = self.activation(out)
+
+        # Linear function 2
+        out = self.W2(out)
+
+        return self.softmax(out)
+
+        # return predicted_vector
 
 
 # Returns: 
@@ -100,8 +111,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-hd", "--hidden_dim", type=int, required = True, help = "hidden_dim")
     parser.add_argument("-e", "--epochs", type=int, required = True, help = "num of epochs to train")
-    parser.add_argument("--train_data", required = True, help = "path to training data")
-    parser.add_argument("--val_data", required = True, help = "path to validation data")
+    parser.add_argument("--train_data", default = "training.json", help = "path to training data")
+    parser.add_argument("--val_data", default = "validation.json", help = "path to validation data")
     parser.add_argument("--test_data", default = "to fill", help = "path to test data")
     parser.add_argument('--do_train', action='store_true')
     args = parser.parse_args()
@@ -124,6 +135,10 @@ if __name__ == "__main__":
     model = FFNN(input_dim = len(vocab), h = args.hidden_dim)
     optimizer = optim.SGD(model.parameters(),lr=0.01, momentum=0.9)
     print("========== Training for {} epochs ==========".format(args.epochs))
+
+    losstrain = []
+    accuracy = []
+    accvalid = []
     for epoch in range(args.epochs):
         model.train()
         optimizer.zero_grad()
@@ -155,6 +170,8 @@ if __name__ == "__main__":
         print("Training completed for epoch {}".format(epoch + 1))
         print("Training accuracy for epoch {}: {}".format(epoch + 1, correct / total))
         print("Training time for this epoch: {}".format(time.time() - start_time))
+        losstrain.append(loss.item())
+        accuracy.append(correct/total)
 
 
         loss = None
@@ -182,6 +199,23 @@ if __name__ == "__main__":
         print("Validation completed for epoch {}".format(epoch + 1))
         print("Validation accuracy for epoch {}: {}".format(epoch + 1, correct / total))
         print("Validation time for this epoch: {}".format(time.time() - start_time))
+        accvalid.append(correct/total)
+
+    currepochs = range(1,args.epochs+1)
+    print(losstrain)
+    print(currepochs)
+    print(accuracy)
+    plt.plot(currepochs,losstrain)
+    plt.title('Training loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.show()
+    plt.plot(currepochs,accuracy)
+    plt.plot(currepochs,accvalid)
+    plt.title('Training and validation accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('accuracy')
+    plt.show()
 
     # write out to results/test.out
     

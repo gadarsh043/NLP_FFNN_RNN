@@ -12,6 +12,7 @@ import json
 import string
 from argparse import ArgumentParser
 import pickle
+import matplotlib.pyplot as plt
 
 unk = '<UNK>'
 # Consult the PyTorch documentation for information on the functions used below:
@@ -30,13 +31,15 @@ class RNN(nn.Module):
         return self.loss(predicted_vector, gold_label)
 
     def forward(self, inputs):
+        h0 = torch.zeros(1,1,self.h)
         # [to fill] obtain hidden layer representation (https://pytorch.org/docs/stable/generated/torch.nn.RNN.html)
-        _, hidden = 
+        _,hidden = self.rnn(inputs,h0)
         # [to fill] obtain output layer representations
-
-        # [to fill] sum over output 
+        # [to fill] sum over output
+        out2 = self.W(hidden[:,-1,:])
 
         # [to fill] obtain probability dist.
+        predicted_vector = self.softmax(out2)
 
         return predicted_vector
 
@@ -60,8 +63,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-hd", "--hidden_dim", type=int, required = True, help = "hidden_dim")
     parser.add_argument("-e", "--epochs", type=int, required = True, help = "num of epochs to train")
-    parser.add_argument("--train_data", required = True, help = "path to training data")
-    parser.add_argument("--val_data", required = True, help = "path to validation data")
+    parser.add_argument("--train_data", default = "training.json", help = "path to training data")
+    parser.add_argument("--val_data", default = "validation.json", help = "path to validation data")
     parser.add_argument("--test_data", default = "to fill", help = "path to test data")
     parser.add_argument('--do_train', action='store_true')
     args = parser.parse_args()
@@ -78,7 +81,7 @@ if __name__ == "__main__":
 
     print("========== Vectorizing data ==========")
     model = RNN(50, args.hidden_dim)  # Fill in parameters
-    # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    #optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     word_embedding = pickle.load(open('./word_embedding.pkl', 'rb'))
 
@@ -87,6 +90,10 @@ if __name__ == "__main__":
 
     last_train_accuracy = 0
     last_validation_accuracy = 0
+    losstrain = []
+    accuracy = []
+    lossvalid = []
+    accvalid = []
 
     while not stopping_condition:
         random.shuffle(train_data)
@@ -115,7 +122,7 @@ if __name__ == "__main__":
                 vectors = [word_embedding[i.lower()] if i.lower() in word_embedding.keys() else word_embedding['unk'] for i in input_words ]
 
                 # Transform the input into required shape
-                vectors = torch.tensor(vectors).view(len(vectors), 1, -1)
+                vectors = torch.tensor(np.array(vectors)).view(len(vectors), 1, -1)
                 output = model(vectors)
 
                 # Get loss
@@ -137,10 +144,13 @@ if __name__ == "__main__":
             loss_count += 1
             loss.backward()
             optimizer.step()
+        
+        losstrain.append((loss_total/loss_count).item())
         print(loss_total/loss_count)
         print("Training completed for epoch {}".format(epoch + 1))
         print("Training accuracy for epoch {}: {}".format(epoch + 1, correct / total))
         trainning_accuracy = correct/total
+        accuracy.append(trainning_accuracy)
 
 
         model.eval()
@@ -156,7 +166,7 @@ if __name__ == "__main__":
             vectors = [word_embedding[i.lower()] if i.lower() in word_embedding.keys() else word_embedding['unk'] for i
                        in input_words]
 
-            vectors = torch.tensor(vectors).view(len(vectors), 1, -1)
+            vectors = torch.tensor(np.array(vectors)).view(len(vectors), 1, -1)
             output = model(vectors)
             predicted_label = torch.argmax(output)
             correct += int(predicted_label == gold_label)
@@ -165,6 +175,7 @@ if __name__ == "__main__":
         print("Validation completed for epoch {}".format(epoch + 1))
         print("Validation accuracy for epoch {}: {}".format(epoch + 1, correct / total))
         validation_accuracy = correct/total
+        accvalid.append(validation_accuracy)
 
         if validation_accuracy < last_validation_accuracy and trainning_accuracy > last_train_accuracy:
             stopping_condition=True
@@ -175,6 +186,19 @@ if __name__ == "__main__":
             last_train_accuracy = trainning_accuracy
 
         epoch += 1
+    currepochs = range(1,epoch+1)
+    
+    plt.plot(currepochs,losstrain)
+    plt.title('Training loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.show()
+    plt.plot(currepochs,accuracy)
+    plt.plot(currepochs,accvalid)
+    plt.title('Training and validation accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('accuracy')
+    plt.show()
 
 
 
